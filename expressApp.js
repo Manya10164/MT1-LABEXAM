@@ -1,163 +1,102 @@
 import express from 'express';
 
 const app = express();
+const PORT = 4000;
 
 app.use(express.json());
 
-// Sample Food Data
 let foods = [
-    {
-        id: 1,
-        foodName: "Pizza",
-        category: "Fast Food",
-        price: 250,
-        availability: true
-    },
-    {
-        id: 2,
-        foodName: "Burger",
-        category: "Fast Food",
-        price: 120,
-        availability: true
-    },
-    {
-        id: 3,
-        foodName: "Ice Cream",
-        category: "Dessert",
-        price: 80,
-        availability: false
-    }
+  { id: 1, foodName: 'Pizza', category: 'Fast Food', price: 250, availability: true },
+  { id: 2, foodName: 'Burger', category: 'Fast Food', price: 150, availability: true },
+  { id: 3, foodName: 'Pasta', category: 'Italian', price: 200, availability: false }
 ];
 
-// GET All Foods
+const requiredFields = ['id', 'foodName', 'category', 'price', 'availability'];
+
+const isPositiveNumber = (value) => typeof value === 'number' && value > 0;
+
 app.get('/foods', (req, res) => {
-    res.status(200).json(foods);
+  res.status(200).json(foods);
 });
 
-// GET Food By ID
 app.get('/foods/:id', (req, res) => {
+  const food = foods.find((item) => item.id === Number(req.params.id));
 
-    const id = Number(req.params.id);
+  if (!food) {
+    return res.status(404).json({ error: 'Food item not found' });
+  }
 
-    const food = foods.find(item => item.id === id);
-
-    if (!food) {
-        return res.status(404).json({
-            message: 'Food item not found'
-        });
-    }
-
-    res.status(200).json(food);
+  res.status(200).json(food);
 });
 
-// POST Add New Food
 app.post('/foods', (req, res) => {
+  const newFood = req.body;
 
-    const { id, foodName, category, price, availability } = req.body;
+  const missingFields = requiredFields.filter((field) => newFood[field] === undefined);
 
-    if (
-        id === undefined ||
-        !foodName ||
-        !category ||
-        typeof price !== 'number' ||
-        price <= 0 ||
-        typeof availability !== 'boolean'
-    ) {
-        return res.status(400).json({
-            message: 'Invalid or missing food details'
-        });
-    }
+  if (missingFields.length > 0) {
+    return res.status(400).json({ error: 'Missing required fields', missingFields });
+  }
 
-    if (foods.some(food => food.id === id)) {
-        return res.status(400).json({
-            message: 'Food ID already exists'
-        });
-    }
+  if (!isPositiveNumber(newFood.price)) {
+    return res.status(400).json({ error: 'Price must be a positive number' });
+  }
 
-    const newFood = {
-        id,
-        foodName,
-        category,
-        price,
-        availability
-    };
+  if (foods.some((item) => item.id === newFood.id)) {
+    return res.status(400).json({ error: 'Food with this id already exists' });
+  }
 
-    foods.push(newFood);
-
-    res.status(201).json({
-        message: 'Food item added successfully',
-        food: newFood
-    });
+  foods.push(newFood);
+  res.status(201).json({ message: 'Food item added successfully', food: newFood });
 });
 
-// PUT Update Food
 app.put('/foods/:id', (req, res) => {
+  const index = foods.findIndex((item) => item.id === Number(req.params.id));
 
-    const id = Number(req.params.id);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Food item not found' });
+  }
 
-    const food = foods.find(item => item.id === id);
+  const { foodName, category, price, availability } = req.body;
 
-    if (!food) {
-        return res.status(404).json({
-            message: 'Food item not found'
-        });
-    }
+  if (price !== undefined && !isPositiveNumber(price)) {
+    return res.status(400).json({ error: 'Price must be a positive number' });
+  }
 
-    const { foodName, category, price, availability } = req.body;
+  const updatedFood = {
+    ...foods[index],
+    ...(foodName !== undefined && { foodName }),
+    ...(category !== undefined && { category }),
+    ...(price !== undefined && { price }),
+    ...(availability !== undefined && { availability })
+  };
 
-    if (
-        (foodName !== undefined && !foodName) ||
-        (category !== undefined && !category) ||
-        (price !== undefined &&
-            (typeof price !== 'number' || price <= 0)) ||
-        (availability !== undefined &&
-            typeof availability !== 'boolean')
-    ) {
-        return res.status(400).json({
-            message: 'Invalid food details'
-        });
-    }
-
-    if (foodName !== undefined) food.foodName = foodName;
-    if (category !== undefined) food.category = category;
-    if (price !== undefined) food.price = price;
-    if (availability !== undefined) food.availability = availability;
-
-    res.status(200).json({
-        message: 'Food updated successfully',
-        food
-    });
+  foods[index] = updatedFood;
+  res.status(200).json({ message: 'Food item updated successfully', food: updatedFood });
 });
 
-// DELETE Food
 app.delete('/foods/:id', (req, res) => {
+  const index = foods.findIndex((item) => item.id === Number(req.params.id));
 
-    const id = Number(req.params.id);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Food item not found' });
+  }
 
-    const index = foods.findIndex(item => item.id === id);
-
-    if (index === -1) {
-        return res.status(404).json({
-            message: 'Food item not found'
-        });
-    }
-
-    const deletedFood = foods.splice(index, 1);
-
-    res.status(200).json({
-        message: 'Food deleted successfully',
-        food: deletedFood[0]
-    });
+  const [deletedFood] = foods.splice(index, 1);
+  res.status(200).json({ message: 'Food item deleted successfully', food: deletedFood });
 });
 
-// Invalid Route
 app.use((req, res) => {
-    res.status(404).json({
-        message: 'Route not found'
-    });
+  res.status(404).json({ error: 'Route not found' });
 });
 
-// Start Server
-app.listen(4000, () => {
-    console.log('Express Server running at http://localhost:4000');
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400) {
+    return res.status(400).json({ error: 'Invalid JSON' });
+  }
+  res.status(500).json({ error: 'Internal server error' });
+});
+
+app.listen(PORT, () => {
+  console.log(`Express Server running at http://localhost:${PORT}`);
 });
